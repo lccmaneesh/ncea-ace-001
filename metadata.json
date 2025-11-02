@@ -1,0 +1,5 @@
+{
+  "name": "NCEA Ace",
+  "description": "A Duolingo-style mobile app to prepare for NCEA Level-1 English and Mathematics in New Zealand. It uses AI to generate quizzes, provide feedback, and offer hints to help students achieve excellence.",
+  "requestFramePermissions": []
+}
