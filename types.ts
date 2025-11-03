@@ -17,6 +17,7 @@ export enum QuestionType {
 export interface Question {
   questionText: string;
   questionType: QuestionType;
+  imageData?: string; // Base64 image data
 }
 
 export interface Feedback {

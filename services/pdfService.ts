@@ -60,6 +60,23 @@ export function generatePdfReport(report: Omit<Report, 'id' | 'date'> & { date?:
     y += 8;
 
     addText(`Question ${index + 1}`, 14, 'bold');
+    
+    if (data.question.imageData) {
+      try {
+        const imgData = `data:image/png;base64,${data.question.imageData}`;
+        const imgWidth = 80; // mm
+        const imgHeight = 60; // mm, assuming 4:3 aspect ratio
+        if (y + imgHeight > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+        doc.addImage(imgData, 'PNG', margin, y, imgWidth, imgHeight);
+        y += imgHeight + 5;
+      } catch(e) {
+        console.error("Failed to add image to PDF", e);
+      }
+    }
+
     addText(data.question.questionText, 12, 'normal');
     y += 4;
     

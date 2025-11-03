@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type, Modality } from '@google/genai';
 import { Subject, Topic, Question, Feedback, MathFeedback, TopicProgress, SessionData } from '../types';
 
 if (!process.env.API_KEY) {
@@ -6,6 +6,10 @@ if (!process.env.API_KEY) {
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+interface QuestionWithPrompt extends Question {
+    imagePrompt?: string;
+}
 
 const quizSchema = {
   type: Type.ARRAY,
@@ -21,6 +25,10 @@ const quizSchema = {
         enum: ['written', 'numeric'],
         description: 'The type of question, either written for English or numeric for Math.',
       },
+      imagePrompt: {
+        type: Type.STRING,
+        description: "A detailed, descriptive prompt for an AI image generator to create a diagram for this question. Only include this field if an image is genuinely helpful. E.g., 'A simple line drawing of a right-angled triangle with labels: hypotenuse c, opposite a, adjacent b. Angle theta is between b and c.'",
+      },
     },
     required: ['questionText', 'questionType'],
   },
@@ -33,7 +41,7 @@ const getBasePrompt = (subject: Subject, topic: Topic) => {
         }
         return `Generate a 5-question quiz for an NCEA Level 1 English student in New Zealand. The questions must be based on the novel 'Of Mice and Men' by John Steinbeck, focusing on the topic of "${topic.name}". Questions should require written, analytical answers suitable for aiming for an 'Excellence' grade. Keep vocabulary appropriate for a year-11 student.`;
     }
-    return `Generate a 5-question quiz for an NCEA Level 1 Mathematics student in New Zealand. The questions must cover the '${topic.name}' topic (e.g., NCEA Achievement Standard AS91027 for Algebra). The difficulty should be appropriate for aiming for an 'Excellence' grade. Questions should have a numeric or simplified expression as the answer.`;
+    return `Generate a 5-question quiz for an NCEA Level 1 Mathematics student in New Zealand. The questions must cover the '${topic.name}' topic (e.g., NCEA Achievement Standard AS91027 for Algebra). The difficulty should be appropriate for aiming for an 'Excellence' grade. Questions should have a numeric or simplified expression as the answer. For each question, if a visual diagram or image would be helpful for the student to understand the problem, provide a detailed and clear prompt for an AI image generator in the 'imagePrompt' field. If no image is necessary, omit the 'imagePrompt' field.`;
 }
 
 const getAdaptivePrompt = (basePrompt: string, progress: TopicProgress) => {
@@ -68,8 +76,36 @@ export async function generateQuiz(subject: Subject, topic: Topic, progress?: To
   });
 
   const jsonText = response.text.trim();
-  const quizData = JSON.parse(jsonText);
-  return quizData as Question[];
+  const quizDataWithPrompts = JSON.parse(jsonText) as QuestionWithPrompt[];
+
+  if (subject === Subject.Mathematics) {
+    const imageGenerationPromises = quizDataWithPrompts.map(async (question) => {
+      if (question.imagePrompt) {
+        try {
+          const imageResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: question.imagePrompt }] },
+            config: {
+              responseModalities: [Modality.IMAGE],
+            },
+          });
+          for (const part of imageResponse.candidates[0].content.parts) {
+            if (part.inlineData) {
+              question.imageData = part.inlineData.data;
+              break;
+            }
+          }
+        } catch (e) {
+          console.error(`Failed to generate image for prompt: "${question.imagePrompt}"`, e);
+        }
+      }
+      const { imagePrompt, ...finalQuestion } = question;
+      return finalQuestion as Question;
+    });
+    return Promise.all(imageGenerationPromises);
+  }
+
+  return quizDataWithPrompts as Question[];
 }
 
 const englishFeedbackSchema = {
@@ -163,6 +199,25 @@ export async function getMathFeedback(question: string, answer: string): Promise
 export async function getMathHint(question: string): Promise<string> {
   const model = 'gemini-2.5-flash-lite';
   const prompt = `A student is stuck on this NCEA Level 1 Mathematics problem: "${question}". Provide one single, meaningful hint to guide them toward the solution without giving away the final answer. The hint should prompt their thinking about the first or next logical step.`;
+  
+  const response = await ai.models.generateContent({
+    model,
+    contents: prompt
+  });
+  
+  return response.text;
+}
+
+export async function getEnglishHint(question: string, topic: Topic): Promise<string> {
+  const model = 'gemini-2.5-flash-lite';
+  let promptContext = '';
+  if (topic.id === 'unfamiliar-text') {
+    promptContext = "This question is about analyzing an unfamiliar text. The hint should direct them to look for a specific language feature or consider the author's purpose without revealing the analysis.";
+  } else {
+    promptContext = `The question is about the novel 'Of Mice and Men' focusing on ${topic.name}. The hint should prompt their thinking about key themes, characters, or literary devices they should consider in their analysis.`;
+  }
+  
+  const prompt = `A student is stuck on this NCEA Level 1 English problem: "${question}". ${promptContext} Provide one single, meaningful hint to guide them toward the solution without giving away the final answer.`;
   
   const response = await ai.models.generateContent({
     model,

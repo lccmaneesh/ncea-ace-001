@@ -103,7 +103,12 @@ const LessonView: React.FC<LessonViewProps> = ({ subject, topic, onComplete }) =
     if (isGettingFeedback) return;
     setIsGettingFeedback(true);
     try {
-        const newHint = await geminiService.getMathHint(questions[currentQuestionIndex].questionText);
+        let newHint: string;
+        if (subject === Subject.English) {
+            newHint = await geminiService.getEnglishHint(questions[currentQuestionIndex].questionText, topic);
+        } else {
+            newHint = await geminiService.getMathHint(questions[currentQuestionIndex].questionText);
+        }
         setHint(newHint);
     } catch (e) {
         console.error(e);
@@ -207,7 +212,7 @@ const LessonView: React.FC<LessonViewProps> = ({ subject, topic, onComplete }) =
         question={currentQuestion}
         questionNumber={currentQuestionIndex + 1}
         onSubmit={handleAnswerSubmit}
-        onGetHint={subject === Subject.Mathematics ? handleGetHint : undefined}
+        onGetHint={handleGetHint}
         isLoading={isGettingFeedback}
         isSubmitted={!!feedback}
       />

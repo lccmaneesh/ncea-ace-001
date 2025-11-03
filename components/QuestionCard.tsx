@@ -25,6 +25,15 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, questionNumber, o
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg border border-slate-100">
       <p className="text-sm font-semibold text-teal-600 mb-2">Question {questionNumber}</p>
+      {question.imageData && (
+        <div className="mb-4 rounded-md overflow-hidden border border-slate-200 bg-slate-50">
+          <img
+            src={`data:image/png;base64,${question.imageData}`}
+            alt="Question diagram"
+            className="w-full h-auto object-contain max-h-64 mx-auto"
+          />
+        </div>
+      )}
       <p className="text-slate-800 text-lg mb-4 whitespace-pre-wrap">{question.questionText}</p>
       <form onSubmit={handleSubmit}>
         {question.questionType === 'written' ? (

@@ -9,6 +9,15 @@ const ReportDetails: React.FC<{ report: Report }> = ({ report }) => {
             {report.sessionData.map((data, index) => (
                 <div key={index} className="border-b border-slate-200 pb-4 last:border-b-0">
                     <p className="font-bold text-slate-700">Question {index + 1}</p>
+                    {data.question.imageData && (
+                        <div className="my-3 rounded-md overflow-hidden border border-slate-200 bg-white p-2">
+                            <img
+                                src={`data:image/png;base64,${data.question.imageData}`}
+                                alt="Question diagram"
+                                className="w-full h-auto object-contain max-w-xs mx-auto"
+                            />
+                        </div>
+                    )}
                     <p className="mt-1 text-slate-600 whitespace-pre-wrap">{data.question.questionText}</p>
                     
                     <p className="font-bold text-slate-700 mt-3">Your Answer</p>
